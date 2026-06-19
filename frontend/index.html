@@ -210,7 +210,7 @@
       alert('🔒 已安全登出！');
     });
 
-    // 🟢 功能 1：載入首頁 Steam 特價榜 (CheapShark API)
+    // 🟢 功能 1：載入首頁 Steam 特價榜 (全面支援商店追蹤)
     async function loadDefaultDeals() {
       gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">正在同步雲端特價資料...</p>';
       try {
@@ -234,7 +234,7 @@
                   <span class="sale-price ${isFree ? 'free-text' : ''}">${isFree ? 'FREE' : '$'+game.salePrice}</span>
                 </div>
               </div>
-              <button class="track-btn" onclick="promptTrackPrice('${game.gameID}', '${game.title.replace(/'/g, "\\'")}', '${game.thumb}', ${game.salePrice})">🎯 追蹤此折扣</button>
+              <button class="track-btn" onclick="promptTrackPriceWithStore('${game.gameID}', '${game.title.replace(/'/g, "\\'")}', '${game.thumb}', ${game.salePrice}, '1')">🎯 追蹤此折扣</button>
             </div>
           `;
           gridContainer.appendChild(card);
