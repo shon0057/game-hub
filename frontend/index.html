@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <title>Gamer Hub🎮</title>
+  <title>Gamer Hub // 雲端完美版 🎮</title>
   <style>
     :root {
       --bg-dark: #090d16;
@@ -150,7 +150,7 @@
     const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app'; // 你的 Node.js 後端網址
     let CURRENT_USER_ID = "test-user-123"; 
 
-    // 🌟 修正：抽離成全域變數，避免重複宣告，好維護、不打架！
+    // 🏪 全域唯一的商店編號對照表
     const STORE_MAP = {
       "1": "Steam 商店",
       "2": "Playfield",
@@ -220,7 +220,7 @@
       alert('🔒 已安全登出！');
     });
 
-    // 🟢 功能 1：載入首頁 Steam 特價榜 (CheapShark API)
+    // 🟢 功能 1：載入首頁 Steam 特價榜
     async function loadDefaultDeals() {
       gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">正在同步雲端特價資料...</p>';
       try {
@@ -275,7 +275,6 @@
           card.className = 'game-card';
           
           const currentPrice = parseFloat(deal.salePrice) === 0 ? '0.00' : deal.salePrice;
-          // 🌟 修正：這裡已刪除重複的內嵌 storeMap，直接讀取全域 STORE_MAP 變數
           const storeName = deal.storeID && STORE_MAP[deal.storeID] ? STORE_MAP[deal.storeID] : "其他數位商店";
           const isFree = parseFloat(currentPrice) === 0;
 
@@ -302,7 +301,7 @@
       }
     }
 
-    // 🟢 功能 3：點擊追蹤，將 storeId 精準打包發送給 Node.js 後端存入 Firebase！
+    // 🟢 功能 3：進階版追蹤功能 (將 storeId 完整傳送給後端儲存)
     function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
       const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
       if (targetPrice === null || targetPrice === "") return;
@@ -314,7 +313,7 @@
         coverUrl: coverUrl,
         targetPrice: parseFloat(targetPrice),
         currentPrice: currentPrice ? parseFloat(currentPrice) : 0,
-        storeId: storeId || "1" // 🌟 確保就算沒抓到 storeId 也能安全存入預設值 "1"
+        storeId: storeId || "1"
       };
 
       fetch(`${BACKEND_URL}/api/wishlist`, {
@@ -334,8 +333,7 @@
       .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器，請確保後端已啟動。'));
     }
 
-    // 🌟 舊版按鈕相容性轉接（指向修正後的 promptTrackPriceWithStore）
-    style="display:none;"
+    // 🌟 舊版相容轉接頭（已移除上方干擾的 style 標籤）
     function promptTrackPrice(gameId, gameName, coverUrl, currentPrice) {
       promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, "1");
     }
@@ -348,7 +346,7 @@
     searchBtn.addEventListener('click', searchGame);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchGame(); });
 
-    // 🟢 功能 4：從 Node.js 後端拉取特定使用者的願望清單
+    // 🟢 功能 4：拉取願望清單並精確對照 STORE_MAP 顯示
     async function loadMyWishlist() {
       try {
         const response = await fetch(`${BACKEND_URL}/api/wishlist/${CURRENT_USER_ID}`);
@@ -370,7 +368,7 @@
             card.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.2)';
           }
 
-          // 🌟 修正：這裡也刪除了重複的 storeMap，改為直接抓最上方的全域 STORE_MAP 變數
+          // 精確讀取全域 STORE_MAP，防止未定義的 storeId 被強制轉成 Steam
           const storeName = wish.storeId && STORE_MAP[wish.storeId] ? STORE_MAP[wish.storeId] : "Steam 商店";
 
           card.innerHTML = `
