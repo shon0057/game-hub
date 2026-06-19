@@ -242,7 +242,7 @@
                   <span class="sale-price ${isFree ? 'free-text' : ''}">${isFree ? 'FREE' : '$'+game.salePrice}</span>
                 </div>
               </div>
-              <button class="track-btn" onclick="addToWishlist('${game.title}', '${game.thumb}', ${game.salePrice})">🎯 追蹤此折扣</button>
+              <<button class="track-btn" onclick="promptTrackPrice('${game.gameID}', '${game.title.replace(/'/g, "\\'")}', '${game.thumb}')">🎯 追蹤此折扣</button>
             </div>
           `;
           gridContainer.appendChild(card);
@@ -321,7 +321,12 @@ fetch(`${BACKEND_URL}/api/wishlist/`, {
       })
       .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器，請確保後端已啟動。'));
     }
-
+// 🌟 轉接頭：如果特價榜按鈕依然呼叫 addToWishlist，直接幫它轉發給 promptTrackPrice！
+function addToWishlist(gameName, coverUrl, currentPrice) {
+  // 將遊戲名稱轉換成簡易的 slug 作為 ID，並直接轉寄
+  const gameId = gameName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  promptTrackPrice(gameId, gameName, coverUrl);
+}
     // 綁定點擊與 Enter 鍵事件
     searchBtn.addEventListener('click', searchGames);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchGames(); });
