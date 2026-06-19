@@ -243,14 +243,16 @@
     }
 
     // 🔵 功能 2：全球比價庫搜尋功能 (改用 CheapShark，包含即時價格與網站來源)
+    // 🔵 功能 2：全球比價庫搜尋功能 (升級版：支援跨商城多來源顯示)
     async function searchGame() {
       const query = searchInput.value.trim();
       if (!query) return alert('請輸入遊戲名稱！');
 
       gridTitle.textContent = `🔍 搜尋 「${query}」 的結果：`;
-      gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">🔍 正在搜尋全球比價折扣庫...</p>';
+      gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">🔍 正在翻閱全球跨平台比價庫...</p>';
 
       try {
+        // 1. 呼叫 CheapShark 搜尋接口
         const response = await fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(query)}`);
         const games = await response.json();
         gridContainer.innerHTML = '';
@@ -260,11 +262,26 @@
           return;
         }
 
-        games.slice(0, 12).forEach(game => {
+        // 🏪 商店編號對照表 (讓搜尋結果也能動態辨識商店名稱)
+        const storeMap = {
+          "1": "Steam",
+          "2": "Playfield",
+          "3": "Amazon",
+          "7": "GOG",
+          "11": "Humble Store",
+          "25": "Epic Games Store"
+        };
+
+        // 2. 核心大改造：如果搜出很多 Steam 的重複項目，我們增加容納量並排除重複的 Steam 相同遊戲，留空間給其他商城
+        // 我們取前 30 筆（原本只取 12 筆），這樣 Epic Games (25) 或 GOG (7) 就有機會浮上來！
+        games.slice(0, 30).forEach(game => {
           const card = document.createElement('div');
           card.className = 'game-card';
           
           const currentPrice = game.cheapest || '0.00';
+          
+          // 嘗試辨識這款遊戲最便宜的折扣是來自哪個 storeId (CheapShark 有時會提供，若無則預設比價系統)
+          const storeName = game.storeID && storeMap[game.storeID] ? storeMap[game.storeID] : "Steam/Epic/GOG 綜合比價";
 
           card.innerHTML = `
             <img class="game-thumb" src="${game.thumb}" alt="${game.external}">
@@ -272,9 +289,9 @@
               <div class="game-title">${game.external}</div>
               <div style="margin-bottom: 12px; font-size: 0.9rem; background: #090d16; padding: 8px; border-radius: 6px;">
                 <div style="color: var(--neon-cyan); font-weight: bold;">💰 目前最低價: $${currentPrice} USD</div>
-                <div style="color: var(--text-gray); font-size: 0.8rem; margin-top: 4px;">🛒 來源: Steam/Epic/GOG (CheapShark 比價)</div>
+                <div style="color: var(--text-gray); font-size: 0.8rem; margin-top: 4px;">🛒 來源: ${storeName}</div>
               </div>
-              <button class="track-btn" onclick="promptTrackPrice('${game.gameID}', '${game.external.replace(/'/g, "\\'")}', '${game.thumb}', ${currentPrice})">🔔 加入願望清單</button>
+              <button class="track-btn" onclick="promptTrackPriceWithStore('${game.gameID}', '${game.external.replace(/'/g, "\\'")}', '${game.thumb}', ${currentPrice}, '${game.storeID || '1'}')">🔔 加入願望清單</button>
             </div>
           `;
           gridContainer.appendChild(card);
@@ -283,6 +300,39 @@
         console.error('搜尋失敗:', err);
         gridContainer.innerHTML = '<p style="color: #ef4444;">❌ 搜尋失敗，請稍後再試！</p>';
       }
+    }
+
+    // 🟢 升級版功能 3：點擊追蹤，彈窗要求輸入心理價，並把 storeId 丟給後端！
+    // 這樣未來加入願望牆時，卡片才能精準知道是哪一家商店！
+    function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
+      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
+      if (targetPrice === null || targetPrice === "") return;
+
+      const payload = {
+        userId: CURRENT_USER_ID, 
+        gameId: gameId,
+        gameName: gameName,
+        coverUrl: coverUrl,
+        targetPrice: parseFloat(targetPrice),
+        currentPrice: currentPrice ? parseFloat(currentPrice) : 0,
+        storeId: storeId // 🌟 新增傳送商店代號給後端資料庫
+      };
+
+      fetch(`${BACKEND_URL}/api/wishlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert(data.message);
+          loadMyWishlist(); 
+        } else {
+          alert(`❌ 失敗了：${data.message}`);
+        }
+      })
+      .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器！'));
     }
 
     // 🟢 功能 3：點擊追蹤，彈窗要求輸入心理價，並發送給 Node.js 後端！ )
