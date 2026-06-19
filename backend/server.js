@@ -167,14 +167,13 @@ cron.schedule('*/30 * * * * *', async () => {
 });
 
 // 🌟 4. 關鍵兼容：如果是 Vercel 雲端環境，不需要也不可以執行 listen 阻擋連線
+// 🌟 刪除原本的 app.listen 區塊，換成這段 Vercel 與本機智慧雙軌匯出：
 if (process.env.VERCEL) {
-  module.exports = app;
+  module.exports = app; // 🌐 雲端環境：把 Express 導出給 Vercel 託管
 } else {
-  // 🟢 如果是本地端 nodemon 環境，才正常啟動監聽監聽端口
-  app.listen(PORT, () => {
+  app.listen(PORT, () => { // 🟢 本機環境：依然能用 nodemon 正常跑 5000 端口
     console.log(`=========================================`);
-    console.log(`🚀 Gamer Hub 後端核心 API 組件裝配完成！`);
-    console.log(`🔗 本地監聽端口：http://localhost:${PORT}`);
+    console.log(`🚀 Gamer Hub 本地端後端開機成功！Port: ${PORT}`);
     console.log(`=========================================`);
   });
 }
