@@ -147,7 +147,7 @@
     const auth = firebase.auth();
 
     const RAWG_KEY = '1973b34407cb40f5b9af61bf64d459be'; 
-    const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app/'; // 你的 Node.js 後端網址
+    const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app';// 你的 Node.js 後端網址
 
     // 🌟 全局變數：核心關鍵！預設是測試帳號，登入後會動態變成使用者的 UID
     let CURRENT_USER_ID = "test-user-123"; 
@@ -301,11 +301,12 @@
         currentPrice: 59.99
 };
 
-      fetch(`${BACKEND_URL}/api/wishlist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
+      // 🟢 確保這裡長這樣：主網址 + /api/wishlist/
+fetch(`${BACKEND_URL}/api/wishlist/`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+})
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -333,7 +334,8 @@
     // 🟢 功能 4：從 Node.js 後端拉取特定使用者的願望清單
     async function loadMyWishlist() {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/wishlist/${CURRENT_USER_ID}`);
+        // 🟢 確保這裡長這樣：主網址 + /api/wishlist/ + 使用者ID
+const response = await fetch(`${BACKEND_URL}/api/wishlist/${CURRENT_USER_ID}`);
         const result = await response.json();
         
         if (!result.success || result.data.length === 0) {
@@ -385,8 +387,8 @@
 
       try {
         const response = await fetch(`${BACKEND_URL}/api/wishlist/${docId}`, {
-          method: 'DELETE'
-        });
+  method: 'DELETE'
+});
         const result = await response.json();
 
         if (result.success) {
