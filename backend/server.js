@@ -10,7 +10,22 @@ const app = express();
 // 🌟 2. 修正宣告：確保 PORT 在最上方宣告，避免報出 ReferenceError!
 const PORT = process.env.PORT || 5000; 
 
-app.use(cors());
+app.use(cors()); // 原本的這行保留
+
+// 🌟 終極解鎖：手動強行塞入 CORS Headers，專治 Vercel 各种阻擋
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // 處理瀏覽器預檢請求 (Preflight Request)
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+app.use(express.json()); // 原本的這行保留
 app.use(express.json());
 
 // 🔐 3. 全新 Base64 安全解碼與初始化邏輯
