@@ -63,7 +63,8 @@ app.get('/', (req, res) => {
 // ==========================================
 app.post('/api/wishlist', async (req, res) => {
   try {
-    const { userId, gameId, gameName, coverUrl, targetPrice, currentPrice } = req.body;
+    // 1. 🌟 修正：從前端傳來的 req.body 裡面，把 storeId 拿出來
+    const { userId, gameId, gameName, coverUrl, targetPrice, currentPrice, storeId } = req.body;
 
     if (!userId || !gameId || targetPrice === undefined) {
       return res.status(400).json({ success: false, message: "欄位資料不齊全" });
@@ -75,11 +76,13 @@ app.post('/api/wishlist', async (req, res) => {
                                     .where('gameId', '==', gameId)
                                     .get();
 
+    // 如果這款遊戲之前已經追蹤過了，執行更新（Update）
     if (!existingWishes.empty) {
       const docId = existingWishes.docs[0].id;
       await db.collection('wishlists').doc(docId).update({
         targetPrice: priceTarget,
         currentPrice: parseFloat(currentPrice) || 0,
+        storeId: storeId || "1", // 🌟 修正：重複點擊時，也同步更新販賣網站
         updatedAt: new Date()
       });
 
@@ -89,6 +92,7 @@ app.post('/api/wishlist', async (req, res) => {
       });
     }
 
+    // 第一次追蹤，執行全新寫入（Add）
     const wishData = {
       userId,
       gameId,
@@ -96,6 +100,7 @@ app.post('/api/wishlist', async (req, res) => {
       coverUrl: coverUrl || '',
       targetPrice: priceTarget,
       currentPrice: parseFloat(currentPrice) || 0,
+      storeId: storeId || "1", // 🌟 修正：把販賣網站編號存進 Firebase 資料庫！如果沒傳就預設 "1" (Steam)
       isNotified: false,
       createdAt: new Date()
     };
