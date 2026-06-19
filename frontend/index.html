@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <title>Gamer Hub // 雲端完美版 🎮</title>
+  <title>Gamer Hub🎮</title>
   <style>
     :root {
       --bg-dark: #090d16;
@@ -150,6 +150,16 @@
     const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app'; // 你的 Node.js 後端網址
     let CURRENT_USER_ID = "test-user-123"; 
 
+    // 🌟 修正：抽離成全域變數，避免重複宣告，好維護、不打架！
+    const STORE_MAP = {
+      "1": "Steam 商店",
+      "2": "Playfield",
+      "3": "Amazon",
+      "7": "GOG 商店",
+      "11": "Humble Store",
+      "25": "Epic Games 商店"
+    };
+
     // 抓取 UI 元素
     const authStatus = document.getElementById('authStatus');
     const authFields = document.getElementById('authFields');
@@ -260,21 +270,13 @@
           return;
         }
 
-        const storeMap = {
-          "1": "Steam 商店",
-          "2": "Playfield",
-          "3": "Amazon",
-          "7": "GOG 商店",
-          "11": "Humble Store",
-          "25": "Epic Games 商店"
-        };
-
         deals.forEach(deal => {
           const card = document.createElement('div');
           card.className = 'game-card';
           
           const currentPrice = parseFloat(deal.salePrice) === 0 ? '0.00' : deal.salePrice;
-          const storeName = deal.storeID && storeMap[deal.storeID] ? storeMap[deal.storeID] : "其他數位商店";
+          // 🌟 修正：這裡已刪除重複的內嵌 storeMap，直接讀取全域 STORE_MAP 變數
+          const storeName = deal.storeID && STORE_MAP[deal.storeID] ? STORE_MAP[deal.storeID] : "其他數位商店";
           const isFree = parseFloat(currentPrice) === 0;
 
           card.innerHTML = `
@@ -300,7 +302,7 @@
       }
     }
 
-    // 🟢 升級版功能 3：點擊追蹤，將 storeId 精準打包發送給 Node.js 後端存入 Firebase！
+    // 🟢 功能 3：點擊追蹤，將 storeId 精準打包發送給 Node.js 後端存入 Firebase！
     function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
       const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
       if (targetPrice === null || targetPrice === "") return;
@@ -312,7 +314,7 @@
         coverUrl: coverUrl,
         targetPrice: parseFloat(targetPrice),
         currentPrice: currentPrice ? parseFloat(currentPrice) : 0,
-        storeId: storeId || "1" // 🌟 萬一沒拿到就預設為 "1" (Steam)
+        storeId: storeId || "1" // 🌟 確保就算沒抓到 storeId 也能安全存入預設值 "1"
       };
 
       fetch(`${BACKEND_URL}/api/wishlist`, {
@@ -333,6 +335,7 @@
     }
 
     // 🌟 舊版按鈕相容性轉接（指向修正後的 promptTrackPriceWithStore）
+    style="display:none;"
     function promptTrackPrice(gameId, gameName, coverUrl, currentPrice) {
       promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, "1");
     }
@@ -358,16 +361,6 @@
 
         wishlistGrid.innerHTML = ''; 
 
-        // 🏪 商店編號對照表
-        const storeMap = {
-          "1": "Steam 商店",
-          "2": "Playfield",
-          "3": "Amazon",
-          "7": "GOG 商店",
-          "11": "Humble Store",
-          "25": "Epic Games 商店"
-        };
-
         result.data.forEach(wish => {
           const card = document.createElement('div');
           card.className = 'game-card';
@@ -377,8 +370,8 @@
             card.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.2)';
           }
 
-          // 🌟 讀取後端資料庫內存下的 storeId，找不到才預設為 Steam
-          const storeName = wish.storeId && storeMap[wish.storeId] ? storeMap[wish.storeId] : "Steam 商店";
+          // 🌟 修正：這裡也刪除了重複的 storeMap，改為直接抓最上方的全域 STORE_MAP 變數
+          const storeName = wish.storeId && STORE_MAP[wish.storeId] ? STORE_MAP[wish.storeId] : "Steam 商店";
 
           card.innerHTML = `
             <img class="game-thumb" src="${wish.coverUrl || 'https://placehold.co/400x200/111827/FFFFFF?text=No+Image'}" alt="${wish.gameName}">
