@@ -16,5 +16,11 @@
       },
       "dest": "backend/server.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/check-prices-and-send-email",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
