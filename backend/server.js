@@ -236,3 +236,33 @@ app.get('/api/check-prices-and-send-email', async (req, res) => {
   try {
     console.log("⏰ 收到 Vercel Cron 排程發出的比價發信請求！");
     await checkPricesAndSendEmailsLogic();
+    res.status(200).json({ success: true, message: "Vercel 雲端排程比價與郵件發送程序執行完畢！" });
+  } catch (error) {
+    console.error("Vercel 排程執行失敗:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// ⏰ 本地端排程補償 (只有在本地用 nodemon 跑時，每隔 30 秒會執行)
+// ==========================================
+if (!process.env.VERCEL) {
+  cron.schedule('*/30 * * * * *', async () => {
+    try {
+      await checkPricesAndSendEmailsLogic();
+    } catch (err) {
+      console.error('🤖 本地端排程巡邏錯誤:', err.message);
+    }
+  });
+}
+
+// 🌟 智慧雙軌匯出：
+if (process.env.VERCEL) {
+  module.exports = app; 
+} else {
+  app.listen(PORT, () => { 
+    console.log(`=========================================`);
+    console.log(`🚀 Gamer Hub 本地端後端開機成功！Port: ${PORT}`);
+    console.log(`=========================================`);
+  });
+}
