@@ -4,13 +4,14 @@ const express = require('express');
 const cors = require('cors');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const nodemailer = require('nodemailer'); // 📧 引入郵件發送套件
+const axios = require('axios');
+const cron = require('node-cron');
 
 const app = express();
-
-// 🌟 2. 修正宣告：確保 PORT 在最上方宣告，避免報出 ReferenceError!
 const PORT = process.env.PORT || 5000; 
 
-app.use(cors()); // 原本的這行保留
+app.use(cors());
 
 // 🌟 終極解鎖：手動強行塞入 CORS Headers，專治 Vercel 各种阻擋
 app.use((req, res, next) => {
@@ -18,28 +19,24 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // 處理瀏覽器預檢請求 (Preflight Request)
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
   next();
 });
 
-app.use(express.json()); // 原本的這行保留
 app.use(express.json());
 
 // 🔐 3. 全新 Base64 安全解碼與初始化邏輯
 if (!process.env.FIREBASE_BASE64) {
-  console.error("❌ 錯誤：找不到環境變數 FIREBASE_BASE64！請確認 .env 檔案內容是否正確。");
+  console.error("❌ 錯誤：找不到環境變數 FIREBASE_BASE64！");
   process.exit(1);
 }
 
 try {
-  // 🌟 把環境變數或 .env 裡的 Base64 密碼字串還原成原本的 JSON 物件
   const decodedKey = Buffer.from(process.env.FIREBASE_BASE64, 'base64').toString('utf8');
   const serviceAccount = JSON.parse(decodedKey);
 
-  // 初始化 Firebase Admin
   initializeApp({
     credential: cert(serviceAccount)
   });
@@ -63,8 +60,8 @@ app.get('/', (req, res) => {
 // ==========================================
 app.post('/api/wishlist', async (req, res) => {
   try {
-    // 1. 🌟 修正：從前端傳來的 req.body 裡面，把 storeId 拿出來
-    const { userId, gameId, gameName, coverUrl, targetPrice, currentPrice, storeId } = req.body;
+    // 🌟 核心升級：請前端多傳入 userEmail，這樣降價時後端才知道要把信寄給誰！
+    const { userId, userEmail, gameId, gameName, coverUrl, targetPrice, currentPrice, storeId } = req.body;
 
     if (!userId || !gameId || targetPrice === undefined) {
       return res.status(400).json({ success: false, message: "欄位資料不齊全" });
@@ -76,13 +73,13 @@ app.post('/api/wishlist', async (req, res) => {
                                     .where('gameId', '==', gameId)
                                     .get();
 
-    // 如果這款遊戲之前已經追蹤過了，執行更新（Update）
     if (!existingWishes.empty) {
       const docId = existingWishes.docs[0].id;
       await db.collection('wishlists').doc(docId).update({
         targetPrice: priceTarget,
         currentPrice: parseFloat(currentPrice) || 0,
-        storeId: storeId || "1", // 🌟 修正：重複點擊時，也同步更新販賣網站
+        userEmail: userEmail || existingWishes.docs[0].data().userEmail || "", // 更新時也順便同步 Email
+        storeId: storeId || "1",
         updatedAt: new Date()
       });
 
@@ -92,15 +89,15 @@ app.post('/api/wishlist', async (req, res) => {
       });
     }
 
-    // 第一次追蹤，執行全新寫入（Add）
     const wishData = {
       userId,
+      userEmail: userEmail || "", // 🔒 存入玩家信箱，供發信機器人讀取
       gameId,
       gameName,
       coverUrl: coverUrl || '',
       targetPrice: priceTarget,
       currentPrice: parseFloat(currentPrice) || 0,
-      storeId: storeId || "1", // 🌟 修正：把販賣網站編號存進 Firebase 資料庫！如果沒傳就預設 "1" (Steam)
+      storeId: storeId || "1", 
       isNotified: false,
       createdAt: new Date()
     };
@@ -148,52 +145,94 @@ app.delete('/api/wishlist/:id', async (req, res) => {
   }
 });
 
-// === 引入自動化定時套件 ===
-const cron = require('node-cron');
-const axios = require('axios');
 
-// ==========================================
-// ⏰ 降價追蹤機器人排程 (每隔 30 秒自動執行)
-// ==========================================
-cron.schedule('*/30 * * * * *', async () => {
-  console.log('🤖 [機器人任務] 檢查時間到！正在巡邏所有玩家的願望清單...');
-  try {
-    const snapshot = await db.collection('wishlists').get();
-    if (snapshot.empty) return;
+// ====================================================
+// 📧 核心發信與比價引擎函數 (抽出來供 本地端排程 與 Vercel 排程 同步共用)
+// ====================================================
+async function checkPricesAndSendEmailsLogic() {
+  console.log('🤖 [機器人任務] 檢查時間到！正在巡邏所有玩家的願望清單並核對降價郵件...');
+  
+  // 1. 初始化郵件發送器（從環境變數讀取你的發信箱帳密）
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER, 
+      pass: process.env.EMAIL_PASS  
+    }
+  });
 
-    snapshot.forEach(async (doc) => {
-      const wish = doc.data();
-      const docId = doc.id;
+  const snapshot = await db.collection('wishlists').get();
+  if (snapshot.empty) {
+    console.log('ℹ️ 目前資料庫中沒有任何玩家追蹤遊戲。');
+    return;
+  }
+
+  // 遍歷所有願望清單進行 CheapShark 比價
+  for (const doc of snapshot.docs) {
+    const wish = doc.data();
+    const docId = doc.id;
+    
+    try {
       const searchUrl = `https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(wish.gameName)}`;
       const searchRes = await axios.get(searchUrl);
       
       if (searchRes.data && searchRes.data.length > 0) {
         const latestPrice = parseFloat(searchRes.data[0].cheapest);
+        
+        // 更新當前最新價格
         await db.collection('wishlists').doc(docId).update({ currentPrice: latestPrice });
 
+        // 觸發降價條件
         if (latestPrice <= wish.targetPrice) {
           if (!wish.isNotified) {
-            console.log(`\n🚨🚨🚨【降價大警報！】 【${wish.gameName}】特價 $${latestPrice}！`);
+            console.log(`🚨【降價警報】${wish.gameName} 特價 $${latestPrice}！期望價：$${wish.targetPrice}`);
+
+            // 📬 如果該筆願望有存電子郵件，則執行發信
+            if (wish.userEmail && wish.userEmail.includes('@')) {
+              const mailOptions = {
+                from: `"Gamer Hub 降價追蹤守護者" <${process.env.EMAIL_USER}>`,
+                to: wish.userEmail,
+                subject: `🔥 降價大驚喜！您追蹤的《${wish.gameName}》已經降到期望價格囉！`,
+                html: `
+                  <div style="font-family: sans-serif; padding: 25px; background: #0f172a; color: #fff; border-radius: 12px; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                    <h2 style="color: #06b6d4; border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-top:0;">🎮 Gamer Hub 降價特報</h2>
+                    <p>親愛的玩家您好：</p>
+                    <p>特大好消息！您在願望清單中苦苦守候的遊戲 <strong>《${wish.name || wish.gameName}》</strong> 降價啦！</p>
+                    <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                      <p style="margin: 5px 0;">💰 <strong>當前最低特價：</strong> <span style="color: #22c55e; font-size: 1.3rem; font-weight: bold;">$${latestPrice}</span></p>
+                      <p style="margin: 5px 0;">🎯 <strong>您的期望價格：</strong> $${wish.targetPrice}</p>
+                    </div>
+                    <p>趕快登入您的 Gamer Hub 查看，或直接前往特價商店搶購吧！🚀</p>
+                    <hr style="border: 0; border-top: 1px solid #1e293b; margin: 20px 0;">
+                    <small style="color: #64748b;">本信件由 Gamer Hub 雲端排程自動發送，請勿直接回信。</small>
+                  </div>
+                `
+              };
+
+              await transporter.sendMail(mailOptions);
+              console.log(`📧 降價通知信已順利送達：${wish.userEmail}`);
+            }
+
+            // 標記為已通知，防止重複轟炸信箱
             await db.collection('wishlists').doc(docId).update({ isNotified: true });
           }
         } else {
-          if (wish.isNotified) await db.collection('wishlists').doc(docId).update({ isNotified: false });
+          // 如果價格回彈高於期望價，把通知開關重設回 false，等下次降價才能再收到信
+          if (wish.isNotified) {
+            await db.collection('wishlists').doc(docId).update({ isNotified: false });
+          }
         }
       }
-    });
-  } catch (error) {
-    console.error('🤖 機器人排程錯誤:', error.message);
+    } catch (singleErr) {
+      console.error(`❌ 處理單筆遊戲 [${wish.gameName}] 時發生錯誤:`, singleErr.message);
+    }
   }
-});
-
-// 🌟 4. 關鍵兼容：如果是 Vercel 雲端環境，不需要也不可以執行 listen 阻擋連線
-// 🌟 刪除原本的 app.listen 區塊，換成這段 Vercel 與本機智慧雙軌匯出：
-if (process.env.VERCEL) {
-  module.exports = app; // 🌐 雲端環境：把 Express 導出給 Vercel 託管
-} else {
-  app.listen(PORT, () => { // 🟢 本機環境：依然能用 nodemon 正常跑 5000 端口
-    console.log(`=========================================`);
-    console.log(`🚀 Gamer Hub 本地端後端開機成功！Port: ${PORT}`);
-    console.log(`=========================================`);
-  });
 }
+
+// ==========================================
+// 📡 路由 5：【對接 Vercel 定時任務的 API 節點】(GET)
+// ==========================================
+app.get('/api/check-prices-and-send-email', async (req, res) => {
+  try {
+    console.log("⏰ 收到 Vercel Cron 排程發出的比價發信請求！");
+    await checkPricesAndSendEmailsLogic();
