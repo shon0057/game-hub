@@ -61,7 +61,9 @@ app.get('/', (req, res) => {
 app.post('/api/wishlist', async (req, res) => {
   try {
     // 🌟 核心升級：請前端多傳入 userEmail，這樣降價時後端才知道要把信寄給誰！
-    const { userId, userEmail, gameId, gameName, coverUrl, targetPrice, currentPrice, storeId } = req.body;
+    // 🔍 同時解構大寫和小寫的 Email，防止前端打錯字或沒傳對
+const { userId, gameId, gameName, coverUrl, targetPrice, currentPrice, storeId } = req.body;
+const userEmail = req.body.userEmail || req.body.userEMail || "";
 
     if (!userId || !gameId || targetPrice === undefined) {
       return res.status(400).json({ success: false, message: "欄位資料不齊全" });
