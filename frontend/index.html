@@ -302,12 +302,23 @@
     }
 
     // 🟢 功能 3：進階版追蹤功能 (將 storeId 完整傳送給後端儲存)
+// 🟢 功能 3：進階版追蹤功能 (將 storeId 與 userEmail 完整傳送給後端儲存)
     function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
       const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
       if (targetPrice === null || targetPrice === "") return;
 
+      // 🔍 自動動態獲取當前登入使用者的 Email
+      let userEmail = "";
+      const currentUser = firebase.auth().currentUser;
+      if (currentUser) {
+        userEmail = currentUser.email; // 🟢 已登入，抓取 Firebase 認證的真實信箱
+      } else {
+        userEmail = "test-user-123@gmail.com"; // 🔒 未登入，給予固定的測試信箱（可改成你自己的常收信箱方便測試）
+      }
+
       const payload = {
         userId: CURRENT_USER_ID, 
+        userEmail: userEmail, // ✨【關鍵修復】把動態抓到的 Email 塞進背包打包帶走！
         gameId: gameId,
         gameName: gameName,
         coverUrl: coverUrl,
