@@ -319,7 +319,7 @@
       // 🔍 【除錯彈窗】當場檢查到底抓到什麼！
       alert(`【發送前檢查】\n當前登入 UID: ${currentUid}\n抓到的 Email: "${userEmail}"\n(如果是空字串，代表前端 Auth 還沒準備好)`);
 
-      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：`, "29.99");
+      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 【${userEmail}】的心理期望價 (美金 USD)：`, "29.99");
       if (targetPrice === null || targetPrice === "") return;
 
       const payload = {
