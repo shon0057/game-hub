@@ -302,24 +302,30 @@
     }
 
     // 🟢 功能 3：進階版追蹤功能 (將 storeId 與 userEmail 完整傳送給後端儲存)
+    // 🟢 功能 3：進階版追蹤功能 (終極除錯防呆版)
     function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
-      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
-      if (targetPrice === null || targetPrice === "") return;
-
-      // 🔍 【核心修正】自動動態獲取當前在網頁上方登入/註冊的玩家 Email
-      let userEmail = "";
+      // 1. 先抓取當前登入狀態
       const currentUser = firebase.auth().currentUser;
+      let userEmail = "";
+      let currentUid = CURRENT_USER_ID;
+
       if (currentUser) {
-        userEmail = currentUser.email; // 🟢 如果已登入，抓取 Firebase Auth 認證的真實信箱
+        userEmail = currentUser.email;
+        currentUid = currentUser.uid; // 強制同步最新的 UID
       } else {
-        // 🔒 如果沒登入，給予一個預設的測試信箱（你可以改成你自己的 Gmail 方便未登入時測試）
-        userEmail = "test-user-123@gmail.com"; 
+        userEmail = "test-user-123@gmail.com"; // 沒登入時的預設防呆信箱
       }
 
+      // 🔍 【除錯彈窗】當場檢查到底抓到什麼！
+      alert(`【發送前檢查】\n當前登入 UID: ${currentUid}\n抓到的 Email: "${userEmail}"\n(如果是空字串，代表前端 Auth 還沒準備好)`);
+
+      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：`, "29.99");
+      if (targetPrice === null || targetPrice === "") return;
+
       const payload = {
-        userId: CURRENT_USER_ID, 
-        userEmail: userEmail, // ✨【關鍵修復】把讀取到的 Email 塞進背包，打包傳給後端！
-        userEmail: userEMail, // ✨【關鍵修復】把讀取到的 Email 塞進背包，打包傳給後端！
+        userId: currentUid, 
+        userEmail: userEmail,   // 送小寫
+        userEMail: userEmail,   // 送大寫（雙重保險）
         gameId: gameId,
         gameName: gameName,
         coverUrl: coverUrl,
@@ -342,7 +348,7 @@
           alert(`❌ 失敗了：${data.message}`);
         }
       })
-      .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器，請確保後端已啟動。'));
+      .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器'));
     }
 
     // 🌟 舊版相容轉接頭（已移除上方干擾的 style 標籤）
