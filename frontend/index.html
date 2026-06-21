@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <title>Gamer Hub // 雲端完美版 🎮</title>
+  <title>Gamer Hub 🎮</title>
   <style>
     :root {
       --bg-dark: #090d16;
@@ -39,6 +39,7 @@
 
     .subtitle { color: var(--text-gray); margin-bottom: 30px; }
 
+    /* 🔍 搜尋框樣式 */
     .search-container {
       display: flex; gap: 10px; width: 100%; max-width: 600px; margin-bottom: 40px;
     }
@@ -85,6 +86,7 @@
     .sale-price { font-size: 1.2rem; font-weight: bold; }
     .free-text { color: var(--neon-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
 
+    /* ➕ 追蹤按鈕樣式 */
     .track-btn {
       width: 100%; background-color: #1f2937; color: #cbd5e1; border: 1px solid #374151;
       padding: 10px; margin-top: 15px; border-radius: 6px; font-weight: bold;
@@ -111,6 +113,21 @@
       <button id="logoutBtn" style="flex: 1; background: #ef4444; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; display: none;">登出</button>
     </div>
   </div>
+
+  <a href="index.html" style="
+      align-self: flex-start;
+      margin-bottom: 20px;
+      color: var(--text-gray);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s;
+  " onmouseover="this.style.color='var(--neon-cyan)'" onmouseout="this.style.color='var(--text-gray)'">
+      ⬅️ 返回作品集主頁
+  </a>
 
   <h1>Gamer Hub</h1>
   <div class="subtitle">即時同步全網最新數位遊戲特惠與全球遊戲庫搜尋</div>
@@ -141,12 +158,14 @@
       measurementId: "G-GT57T3FH1T"
     };
 
+    // 初始化 Firebase 前端
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
-    const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app'; 
+    const BACKEND_URL = 'https://game-hub-six-zeta-16.vercel.app'; // 你的 Node.js 後端網址
     let CURRENT_USER_ID = "test-user-123"; 
 
+    // 🏪 全域唯一的商店編號對照表
     const STORE_MAP = {
       "1": "Steam 商店",
       "2": "Playfield",
@@ -156,6 +175,7 @@
       "25": "Epic Games 商店"
     };
 
+    // 抓取 UI 元素
     const authStatus = document.getElementById('authStatus');
     const authFields = document.getElementById('authFields');
     const loginBtn = document.getElementById('loginBtn');
@@ -167,6 +187,7 @@
     const searchBtn = document.getElementById('searchBtn');
     const wishlistGrid = document.getElementById('wishlistGrid');
 
+    // ================= 🔐 Firebase 身份監聽器 =================
     auth.onAuthStateChanged((user) => {
       if (user) {
         CURRENT_USER_ID = user.uid; 
@@ -186,6 +207,7 @@
       loadMyWishlist();
     });
 
+    // 🔵 註冊功能
     registerBtn.addEventListener('click', async () => {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value.trim();
@@ -196,6 +218,7 @@
       } catch (err) { alert('註冊失敗：' + err.message); }
     });
 
+    // 🟢 登入功能
     loginBtn.addEventListener('click', async () => {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value.trim();
@@ -206,11 +229,13 @@
       } catch (err) { alert('登入失敗：' + err.message); }
     });
 
+    // 🔴 登出功能
     logoutBtn.addEventListener('click', async () => {
       await auth.signOut();
       alert('🔒 已安全登出！');
     });
 
+    // 🟢 功能 1：載入首頁 Steam 特價榜
     async function loadDefaultDeals() {
       gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">正在同步雲端特價資料...</p>';
       try {
@@ -224,9 +249,9 @@
           const card = document.createElement('div');
           card.className = 'game-card';
           
-          // ✨ 修正點擊事件：使用安全轉義，避免單引號與 ${} 造成的 JS 崩潰
+          // ✨ 轉義優化，防止引號導致的語法崩潰
           const safeTitle = game.title.replace(/'/g, "\\'");
-          
+
           card.innerHTML = `
             <img class="game-thumb" src="${game.thumb}" alt="${game.title}">
             <div class="game-info">
@@ -246,11 +271,29 @@
       } catch (err) { console.error(err); }
     }
 
+    // 🔵 功能 2：全球比價庫搜尋功能
     async function searchGame() {
       const query = searchInput.value.trim();
       if (!query) return alert('請輸入遊戲名稱！');
 
-      gridTitle.textContent = `🔍 搜尋 「${query}」 的結果：`;
+      // 🌟 完美保留：清除搜尋（回焦點特惠）按鈕
+      gridTitle.innerHTML = `
+        🔍 搜尋 「${query}」 的結果：
+        <button onclick="resetSearch()" style="
+            font-size: 0.8rem; 
+            background: #1f2937; 
+            color: var(--text-gray); 
+            border: 1px solid #374151; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            margin-left: 10px; 
+            cursor: pointer;
+            font-family: sans-serif;
+        " onmouseover="this.style.color='#fff'; this.style.borderColor='var(--neon-magenta)'" 
+           onmouseout="this.style.color='var(--text-gray)'; this.style.borderColor='#374151';">
+          ❌ 清除搜尋（回焦點特惠）
+        </button>
+      `;
       gridContainer.innerHTML = '<p style="color: var(--neon-cyan);">🔍 正在翻閱全球跨平台比價庫...</p>';
 
       try {
@@ -295,8 +338,16 @@
       }
     }
 
-    // 🟢 功能 3：進階版追蹤功能 (終極整合除錯防呆版)
+    // 🌟 完美保留：重置搜尋函數
+    function resetSearch() {
+      searchInput.value = ''; // 清空輸入框
+      gridTitle.textContent = '🔥 本週 Steam 焦點熱門特惠'; // 還原標題
+      loadDefaultDeals(); // 重新載入初始資料
+    }
+
+    // 🟢 功能 3：進階版追蹤功能 (修復了不彈窗問題、並完美整合 Email 發送防呆)
     function promptTrackPriceWithStore(gameId, gameName, coverUrl, currentPrice, storeId) {
+      // 1. 抓取最新的登入狀態與 Email 
       const currentUser = firebase.auth().currentUser;
       let userEmail = "";
       let currentUid = CURRENT_USER_ID;
@@ -305,19 +356,20 @@
         userEmail = currentUser.email;
         currentUid = currentUser.uid; 
       } else {
-        userEmail = "test-user-123@gmail.com"; 
+        userEmail = "test-user-123@gmail.com"; // 測試模式防呆信箱
       }
 
-      // 🔍 這次絕對會彈出來的除錯提示窗！
+      // 🔍 這是點擊時一定會跳出來的確認資訊視窗！
       alert(`【發送前檢查】\n當前登入 UID: ${currentUid}\n抓到的 Email: "${userEmail}"`);
 
-      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：`, "29.99");
+      const targetPrice = prompt(`請輸入追蹤 【${gameName}】 的心理期望價 (美金 USD)：\n例如：當價格低於多少時通知你？`, "29.99");
       if (targetPrice === null || targetPrice === "") return;
 
+      // 📦 同時打包大寫和小寫的欄位名稱，達到前後端完美對接
       const payload = {
         userId: currentUid, 
-        userEmail: userEmail,   
-        userEMail: userEmail,   
+        userEmail: userEmail,   // 欄位防呆 1
+        userEMail: userEmail,   // 欄位防呆 2
         gameId: gameId,
         gameName: gameName,
         coverUrl: coverUrl,
@@ -340,7 +392,7 @@
           alert(`❌ 失敗了：${data.message}`);
         }
       })
-      .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器'));
+      .catch(err => alert('❌ 無法連線到後端 Node.js 伺服器，請確保後端已啟動。'));
     }
 
     // 🌟 舊版相容轉接頭
@@ -356,6 +408,7 @@
     searchBtn.addEventListener('click', searchGame);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchGame(); });
 
+    // 🟢 功能 4：拉取願望清單
     async function loadMyWishlist() {
       try {
         const response = await fetch(`${BACKEND_URL}/api/wishlist/${CURRENT_USER_ID}`);
@@ -410,6 +463,7 @@
       }
     }
 
+    // 🔴 功能 5：刪除願望
     async function deleteFromWishlist(docId) {
       if (!confirm("確定要取消追蹤這款遊戲嗎？")) return;
 
@@ -430,6 +484,7 @@
       }
     }
 
+    // 初始化加載
     loadDefaultDeals();
     loadMyWishlist();
   </script>
